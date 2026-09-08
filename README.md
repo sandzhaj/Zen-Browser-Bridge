@@ -1,54 +1,64 @@
 # Zen Browser Bridge
 
-A standalone WebExtension and Native Messaging host exposing browser tabs to local applications. Raycast is one client; scripts, launchers, and other local tools can use the same protocol. No Raycast libraries or installation are required.
+**Your Zen tabs, connected to your favorite tools.**
+
+Bring [Zen Browser](https://zen-browser.app/) into your workflow. Zen Browser Bridge lets local apps, launchers, and scripts find your open tabs and switch straight to them — including pinned tabs — without opening duplicates or typing into the address bar.
+
+Built for **Zen Browser on macOS**. Firefox is not a supported target; Mozilla Add-ons provides the distribution channel for Zen's Firefox-based extension system.
+
+## What you can do
+
+- **Jump to an existing tab.** Activate the tab you already have open and bring its window into focus.
+- **Find pinned tabs.** Let compatible tools list pinned tabs alongside their own search results.
+- **Choose your tools.** Use it with Raycast or build your own integration. Raycast is optional.
+- **Keep the connection local.** No cloud account, remote server, or analytics. Private tabs are excluded.
+
+This is a bridge for other apps, so it does not add a search panel inside Zen. A compatible client provides the search and controls.
 
 ## Install (macOS)
 
-Run `node install.cjs` from this directory, then load `addon/manifest.json` using Zen's `about:debugging` page. Temporary add-ons must be loaded again after restarting Zen. Permanent installation requires a signed XPI. The installer records the current Node executable path; run it again if Node moves.
+You need [Zen Browser](https://zen-browser.app/), Node.js 22 or newer, and a compatible local client. Installation has two parts: the browser add-on and a small local helper that connects it to your apps.
 
-Upgrading from Zen Raycast Bridge: remove the old temporary add-on, install this host, then load the new manifest. After the old add-on is removed, the old `~/.zen-raycast-bridge` directory and `~/Library/Application Support/Mozilla/NativeMessagingHosts/zen_raycast_bridge.json` can be deleted. No legacy transport fallback is included.
-
-## Protocol (0.2)
-
-Discover `*.sock` files in `~/.zen-browser-bridge`. Each connected browser profile has its own socket. Stale sockets can remain after a crash: ignore connection failures. Connect using a Unix socket, send one UTF-8 JSON object followed by a newline, and read one newline-terminated JSON response. Use a timeout (7 seconds recommended). Requests and responses must fit within 1 MiB. The connection closes after the response.
-
-Requests:
-
-- `{"method":"list"}` — all nonprivate tabs.
-- `{"method":"list","pinned":true}` — only pinned tabs; `false` selects unpinned tabs.
-- `{"method":"activate","session":"SESSION_FROM_LIST","tabId":123}` — activate an existing nonprivate tab and focus its window. Send to the socket that supplied that tab.
-
-Success: `{"id":"TRANSPORT_ID","result":...}`. Failure: `{"id":"TRANSPORT_ID","error":"message"}` (transport validation failures may omit `id`). The host generates `id`; clients do not need to send it.
-
-List results contain `id` (session-qualified tab identity), `session`, `tabId`, `windowId`, `pinned`, `title`, and `url`. Activation returns `true`. Session identifiers prevent reuse of stale results after browser restart. Closed tabs return an error; no new tab is created. Activation and window focus are sequential: a focus failure can be reported after the tab has already activated.
-
-Example with Node.js, passing a discovered socket path as the argument:
+### 1. Install the local helper
 
 ```sh
-node -e 'const s=require("node:net").createConnection(process.argv[1]); s.setTimeout(7000,()=>s.destroy()); s.on("connect",()=>s.write(JSON.stringify({method:"list"})+"\n")); s.on("data",b=>process.stdout.write(b)); s.on("error",console.error)' "$SOCKET_PATH"
+git clone https://github.com/sandzhaj/Zen-Browser-Bridge.git
+cd Zen-Browser-Bridge
+node install.cjs
 ```
 
-The bridge exposes only listing and activation. Titles come from the standard browser API; Zen-specific workspace names and sidebar aliases are not exposed. Private tabs are excluded. Local processes running as your user can use the bridge; directory/socket permissions restrict access by other users. No TCP listener, remote access, UI automation, or browser-profile editing is involved.
+The helper needs no administrator access. Run the installer again if you move or upgrade your Node.js installation, or update the helper's code.
 
-Pinned titles: `title` preserves the first nonempty title observed for each pinned tab during the companion session. `pageTitle` always contains the current API title. This prevents page loading from overwriting an initially visible pinned name. It cannot recover an alias already missing from the API at first observation, and resets when the companion restarts. Unpinning or closing the tab clears its preserved title. Sidebar renames after first observation are not detected by this mechanism.
+### 2. Load the browser add-on
 
-## Development
+For the current development version, open `about:debugging#/runtime/this-firefox` in **Zen**, choose **Load Temporary Add-on**, and select `addon/manifest.json` from the cloned repository.
 
-Requires Node.js 22 or newer. Run `npm ci`, `npm test`, `npm run lint`, and `npm run build`. Tests use Node's test runner and a real native-host subprocess; they do not need a browser. Build output in `web-ext-artifacts` is unsigned. Load `addon/manifest.json` in Zen to test browser-specific behavior manually.
+Temporary add-ons need to be loaded again after restarting Zen. A permanent installation requires a Mozilla-signed release. Installing the browser add-on alone does not install the local helper.
 
-## Automated publication
+### 3. Connect your tools
 
-The `Test and publish` GitHub Actions workflow runs tests, Mozilla's extension validator, and packaging on Linux and macOS for pull requests and pushes to `main`. After successful checks on `main`, it submits a **listed** version to Mozilla Add-ons (AMO). Manual runs on `main` are also supported. Mozilla review can delay or reject publication; a successful upload is not a promise of immediate store availability.
+Open your compatible client and use its tab search. For the Raycast integration, open **Search Bookmarks** to find pinned tabs alongside ordinary bookmarks.
 
-One-time setup:
+## Privacy
 
-1. Sign in to [Mozilla Add-ons Developer Hub](https://addons.mozilla.org/developers/) and accept its developer agreement.
-2. Generate [AMO API credentials](https://addons.mozilla.org/developers/addon/api/key/).
-3. In this GitHub repository's **Settings → Secrets and variables → Actions**, add `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`. Never commit these values.
-4. Merge into `main` or launch the workflow manually on `main`.
+Tab URLs and titles are shared with local applications running as your macOS user. Use clients you trust. Zen will ask you to approve this data transmission when installing the add-on, even though the bridge sends nothing to a remote server.
 
-The first submission creates the listing using `amo-metadata.json`; further submissions update the same extension ID. CI assigns a unique `0.2.RUN_NUMBER.RUN_ATTEMPT` manifest version without committing generated versions. Reruns create another version; rerun only the latest main publication to avoid submitting an older version after a newer one. Download the exact unsigned submission ZIP from the workflow artifact. The signed store version is distributed by AMO.
+Read the [privacy details](PRIVACY.md).
 
-The native host is **not** installed by AMO or bundled into the browser add-on ZIP. Users must clone this repository and run `npm run host:install` separately. Host changes require reinstalling the host. Browser add-on updates keep the same extension ID and native host name.
+## Good to know
 
-The store manifest requires Firefox/Gecko 142+ to use the built-in data-transmission consent (including Zen versions based on compatible Gecko). URLs and titles go to local clients, so the manifest declares that transmission even though the bridge has no remote server. See [PRIVACY.md](PRIVACY.md).
+- Pinned titles retain the first name the bridge sees during its session. A sidebar name already missing from the browser API cannot be recovered, and subsequent sidebar renames may not appear until the bridge restarts.
+- Workspace names and the distinction between Essentials and other pinned tabs are not exposed. Essentials appear when Zen reports them as pinned.
+- Zen handles workspace selection and sidebar behavior when a tab is activated.
+
+## Build an integration
+
+Any local client that can connect to a Unix socket can use the bridge. See the [protocol and example](docs/PROTOCOL.md) or the [development guide](CONTRIBUTING.md).
+
+## Uninstall
+
+Remove the add-on from Zen and close Zen. Then delete `~/.zen-browser-bridge` and `~/Library/Application Support/Mozilla/NativeMessagingHosts/zen_browser_bridge.json`.
+
+---
+
+An independent community project, not affiliated with Zen Browser or Mozilla. [MIT licensed](LICENSE).
