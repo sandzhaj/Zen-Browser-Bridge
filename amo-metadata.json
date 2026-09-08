@@ -1,0 +1,23 @@
+{
+  "categories": {
+    "firefox": [
+      "other"
+    ]
+  },
+  "summary": {
+    "en-US": "Connect local tools to browser tabs through a Native Messaging bridge."
+  },
+  "description": {
+    "en-US": "List nonprivate tabs and activate existing tabs from local applications. Requires the separately installed macOS native host and Node.js. Setup: https://github.com/sandzhaj/Zen-Browser-Bridge#install-macos . Transmits tab URLs and titles only to local applications running as your user; no remote server or analytics."
+  },
+  "homepage": {
+    "en-US": "https://github.com/sandzhaj/Zen-Browser-Bridge"
+  },
+  "version": {
+    "license": "MIT",
+    "compatibility": [
+      "firefox"
+    ],
+    "approval_notes": "Requires the macOS Native Messaging host. Host source and setup are at https://github.com/sandzhaj/Zen-Browser-Bridge . No build step or minification; addon/ is the complete browser source. Data is sent only to local clients."
+  }
+}
