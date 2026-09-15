@@ -7,8 +7,12 @@ const crypto = require("node:crypto");
 const directory = path.join(os.homedir(), ".zen-browser-bridge");
 fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
 fs.chmodSync(directory, 0o700);
-const socketPath = path.join(directory, `${process.pid}-${crypto.randomUUID().slice(0, 8)}.sock`);
+const socketPath = path.join(
+  directory,
+  `${process.pid}-${crypto.randomUUID().slice(0, 8)}.sock`,
+);
 const pending = new Map();
+const { enrichTabs } = require("./titles.cjs");
 const MAX = 1024 * 1024;
 const server = net.createServer((socket) => {
   let input = "";
@@ -22,7 +26,8 @@ const server = net.createServer((socket) => {
     socket.removeAllListeners("data");
     try {
       const request = JSON.parse(input.split("\n")[0]);
-      if (!["list", "activate"].includes(request.method)) throw new Error("Unknown command");
+      if (!["list", "activate"].includes(request.method))
+        throw new Error("Unknown command");
       const id = crypto.randomUUID();
       pending.set(id, socket);
       socket.on("close", () => pending.delete(id));
@@ -50,7 +55,11 @@ process.stdin.on("data", (chunk) => {
     }
     buffer = buffer.subarray(length + 4);
     const socket = pending.get(response.id);
-    if (socket) socket.end(JSON.stringify(response) + "\n");
+    if (socket) {
+      if (Array.isArray(response.result))
+        response.result = enrichTabs(response.result);
+      socket.end(JSON.stringify(response) + "\n");
+    }
     pending.delete(response.id);
   }
 });

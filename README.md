@@ -47,7 +47,7 @@ Read the [privacy details](PRIVACY.md).
 
 ## Good to know
 
-- Pinned titles retain the first name the bridge sees during its session. A sidebar name already missing from the browser API cannot be recovered, and subsequent sidebar renames may not appear until the bridge restarts.
+- Pinned names are read from Zen’s saved session using a per-tab marker stored through the `sessions` API. Renames appear after Zen saves its session and the client refreshes its list. Until an exact match is available, the current page title is shown. The default macOS Zen Profiles directory is supported; custom profile locations are not yet supported.
 - Workspace names and the distinction between Essentials and other pinned tabs are not exposed. Essentials appear when Zen reports them as pinned.
 - Zen handles workspace selection and sidebar behavior when a tab is activated.
 
